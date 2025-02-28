@@ -1,0 +1,197 @@
+services:
+  spark-master:
+    image: crypto-viz-spark-master
+    container_name: crypto-viz-spark-master
+    build:
+      context: ./spark
+    environment:
+      - SPARK_MODE=master
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
+      - SPARK_SSL_ENABLED=no
+      - KAFKA_BROKER_URL=kafka:9092
+      - KAFKA_TOPIC=${KAFKA_TOPIC}
+      - FLASK_API_URL=${FLASK_API_URL}
+    # ports:
+    #   - ${SPARK_MASTER_PORT}:8080
+    volumes:
+      - ./spark/apps:/opt/bitnami/spark/apps
+      - ./spark/data:/opt/bitnami/spark/data
+    depends_on:
+      - kafka
+
+  spark-worker:
+    image: crypto-viz-spark-worker
+    build:
+      context: ./spark
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark-master:7077
+      - SPARK_WORKER_MEMORY=1G
+      - SPARK_WORKER_CORES=1
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
+      - SPARK_SSL_ENABLED=no
+      - KAFKA_TOPIC=${KAFKA_TOPIC}
+    volumes:
+      - ./spark/apps:/opt/bitnami/spark/apps
+      - ./spark/data:/opt/bitnami/spark/data
+    depends_on:
+      - spark-master
+
+  zookeeper:
+    image: wurstmeister/zookeeper
+    container_name: crypto-viz-zookeeper
+
+  kafka:
+    image: wurstmeister/kafka
+    environment:
+      - KAFKA_ADVERTISED_HOST_NAME=kafka
+      - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
+    ports:
+      - ${KAFKA_PORT}:9092
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+    container_name: crypto-viz-kafka
+
+  crypto-viz-scraper:
+    image: crypto-viz-scraper
+    environment:
+      - KAFKA_BROKER_URL=kafka:9092
+      - KAFKA_TOPIC=${KAFKA_TOPIC}
+      - SCRAPY_BUFFER_SIZE=${SCRAPY_BUFFER_SIZE}
+      - SCRAPY_SLEEP_TIME=${SCRAPY_SLEEP_TIME}
+    build:
+      context: ./scrapy
+    volumes:
+      - ./scrapy:/usr/src/app
+    depends_on:
+      - kafka
+    container_name: crypto-viz-scrapper
+
+  crypto-viz-flask-api:
+    container_name: crypto-viz-flask-api
+    build:
+      context: ./flask-api
+    # ports:
+    #   - ${FLASK_API_PORT}:5000
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+    volumes:
+       - ./flask-api:/usr/src/app
+    depends_on:
+      - crypto-viz-database
+
+  crypto-viz-database:
+    image: postgres:13
+    container_name: crypto-viz-database
+    environment:
+        POSTGRES_DB: ${DATABASE_NAME}
+        POSTGRES_USER: ${DATABASE_USERNAME}
+        POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
+    volumes:
+        - database-data:/var/lib/postgresql/data
+    ports:
+      - "${POSTGRES_PORT}:5432"
+    healthcheck:
+        test:
+            - CMD
+            - pg_isready
+            - "-q"
+            - "-d"
+            - "${DATABASE_NAME}"
+            - "-U"
+            - "${DATABASE_USERNAME}"
+        retries: 3
+        timeout: 5s
+
+  crypto-viz-adminer:
+      image: adminer
+      container_name: crypto-viz-adminer
+      restart: always
+      environment:
+          ADMINER_DESIGN: ${ADMINER_DESIGN}
+      ports:
+          - ${ADMINER_PORT}:8080
+      links:
+          - crypto-viz-database:db
+      depends_on:
+          - crypto-viz-database
+
+  crypto-viz-grafana:
+    image: docker.io/grafana/grafana-oss:11.3.0
+    container_name: crypto-viz-grafana
+    ports:
+      - ${GRAFANA_PORT}:3000
+    volumes:
+      - grafana-data:/var/lib/grafana
+    restart: unless-stopped
+    networks:
+      - crypto-viz-monotoring
+
+  # Prometheus is used to collect metrics
+  crypto-viz-prometheus:
+    image: docker.io/prom/prometheus:v2.55.1
+    container_name: crypto-viz-prometheus
+    ports:
+      - ${PROMETHEUS_PORT}:9090
+    command: "--config.file=/etc/prometheus/prometheus.yaml"
+    volumes:
+      - ./prometheus/prometheus.yaml:/etc/prometheus/prometheus.yaml:ro
+      - prometheus-data:/prometheus
+    restart: unless-stopped
+    depends_on:
+      - crypto-viz-node-exporter
+      - crypto-viz-cadvisor
+    networks:
+      - crypto-viz-monotoring
+
+  # Below you'll find prometheus exporters, which are used to collect
+  # metrics from the host machine.
+
+  # Node exporter is used to collect metrics about the host machine.
+  crypto-viz-node-exporter:
+    image: quay.io/prometheus/node-exporter:v1.8.2
+    container_name: crypto-viz-node-exporter
+    command: "--path.rootfs=/host"
+    pid: host
+    restart: unless-stopped
+    volumes:
+      - /:/host:ro
+    networks:
+      - crypto-viz-monotoring
+
+  # Cadvisor is used to collect metrics about the containers running on the
+  # host machine.
+  crypto-viz-cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.47.1
+    container_name: crypto-viz-cadvisor
+    ports:
+      - ${CADVISOR_PORT}:8080
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /etc/machine-id:/etc/machine-id:ro
+      - /var/lib/dbus/machine-id:/var/lib/dbus/machine-id:ro
+    platform: linux/arm64/v8
+    devices:
+      - /dev/kmsg
+    privileged: true
+    restart: unless-stopped
+    networks:
+      - crypto-viz-monotoring
+
+volumes:
+  database-data:
+  prometheus-data:
+  grafana-data:
+
+networks:
+  crypto-viz-monotoring:
+    driver: bridge
