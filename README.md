@@ -1,7 +1,7 @@
 # 🚀 CryptoViz: Cryptocurrency Analysis and Visualization
 
 ## 📌 **Project Overview**
-CryptoViz is a **comprehensive solution for collecting, processing, and visualizing cryptocurrency data**. This project is designed to **scrape real-time data** from the **top 100 cryptocurrencies on CoinMarketCap**, process it using **Apache Spark**, store it in **PostgreSQL**, and analyze it with **Power BI**. Advanced monitoring is ensured through **Grafana and Prometheus**.
+CryptoViz is a **comprehensive solution for collecting, processing, and visualizing cryptocurrency data**. This project is designed to **scrape real-time data** from the **top 10 cryptocurrencies on CoinMarketCap**, process it using **Apache Spark**, store it in **PostgreSQL**, and analyze it with **Power BI**. Advanced monitoring is ensured through **Grafana and Prometheus**.
 
 The goal is to provide users with a **dynamic analysis of crypto market trends**, offering key insights such as **volatility, price evolution, and market variations**.
 
