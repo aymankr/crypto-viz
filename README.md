@@ -1,4 +1,33 @@
-# Crypto-Viz
+# 🚀 CryptoViz: Cryptocurrency Analysis and Visualization
+
+## 📌 **Project Overview**
+CryptoViz is a **comprehensive solution for collecting, processing, and visualizing cryptocurrency data**. This project is designed to **scrape real-time data** from the **top 100 cryptocurrencies on CoinMarketCap**, process it using **Apache Spark**, store it in **PostgreSQL**, and analyze it with **Power BI**. Advanced monitoring is ensured through **Grafana and Prometheus**.
+
+The goal is to provide users with a **dynamic analysis of crypto market trends**, offering key insights such as **volatility, price evolution, and market variations**.
+
+---
+
+## 🛠 **Technical Stack and Architecture**
+The project is built on a **distributed architecture** with multiple Docker containers orchestrated using `docker-compose`. Below is the data flow:
+
+1. **Scraping (Scrapy)** 🕷️
+   - Extracts prices, percentage changes, market cap, 24h volume, etc.
+   - Sends real-time data to **Kafka**.
+
+2. **Streaming and Data Processing (Kafka + Spark)** ⚡
+   - Kafka stores streaming messages.
+   - **Apache Spark** processes the data using a **Spark Master** and **8 configurable Workers**.
+   - Cleans and transforms the data before database insertion.
+
+3. **Storage and API (PostgreSQL + Flask API)** 🗄️
+   - Spark sends processed data to **Flask API**, which inserts it into **PostgreSQL**.
+   - The API also exposes endpoints for querying the data.
+
+4. **Visualization and Monitoring (Power BI + Grafana + Prometheus)** 📊
+   - **Power BI** connects to PostgreSQL to display key indicators.
+   - **Grafana & Prometheus** monitor the pipeline's performance.
+
+📄 **A detailed architecture document is included to illustrate the interactions between services.**
 
 ## Prerequisites
 
